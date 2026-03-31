@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forward Extra 情境计算器</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#121936;
+      --panel2:#182146;
+      --text:#eef2ff;
+      --muted:#aab4d6;
+      --accent:#7aa2ff;
+      --good:#21c55d;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --border:#29345f;
+      --input:#0f1630;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Noto Sans SC", sans-serif;
+      background:linear-gradient(180deg,#08101f 0%, #0d1530 100%);
+      color:var(--text);
+    }
+    .wrap{
+      max-width:1280px;
+      margin:0 auto;
+      padding:24px;
+    }
+    h1{
+      margin:0 0 10px 0;
+      font-size:30px;
+      line-height:1.15;
+    }
+    .sub{
+      color:var(--muted);
+      margin-bottom:24px;
+      line-height:1.5;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 380px 1fr;
+      gap:20px;
+    }
+    .panel{
+      background:rgba(18,25,54,.92);
+      border:1px solid var(--border);
+      border-radius:20px;
+      padding:18px;
+      box-shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    .panel h2{
+      margin:0 0 14px 0;
+      font-size:18px;
+    }
+    .inputs{
+      display:grid;
+      gap:12px;
+    }
+    .field{
+      display:grid;
+      gap:6px;
+    }
+    label{
+      font-size:13px;
+      color:var(--muted);
+    }
+    input, select{
+      width:100%;
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:var(--input);
+      color:var(--text);
+      font-size:15px;
+      outline:none;
+    }
+    .row2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+    .row3{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:12px;
+    }
+    .note{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:14px;
+      background:#101733;
+      border:1px dashed #3a477e;
+      color:#c8d1f0;
+      font-size:13px;
+      line-height:1.5;
+    }
+    .cards{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:16px;
+      margin-bottom:16px;
+    }
+    .card{
+      background:linear-gradient(180deg,var(--panel2),var(--panel));
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:16px;
+    }
+    .tag{
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:999px;
+      font-size:12px;
+      margin-bottom:10px;
+      background:#0f1b44;
+      border:1px solid #3954ad;
+      color:#c9d5ff;
+    }
+    .good{ color:var(--good); }
+    .warn{ color:var(--warn); }
+    .bad{ color:var(--bad); }
+    .num{
+      font-size:28px;
+      font-weight:700;
+      margin:10px 0 4px 0;
+    }
+    .small{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
+    }
+    .table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:14px;
+      font-size:14px;
+    }
+    .table th,.table td{
+      padding:10px 8px;
+      border-bottom:1px solid var(--border);
+      vertical-align:top;
+      text-align:left;
+    }
+    .table th{
+      color:#cdd7fb;
+      font-weight:600;
+      background:#0d1530;
+      position:sticky;
+      top:0;
+    }
+    .formula{
+      margin-top:16px;
+      padding:14px;
+      background:#0d1530;
+      border:1px solid var(--border);
+      border-radius:16px;
+      color:#d6dfff;
+      line-height:1.65;
+      font-size:14px;
+    }
+    .footer{
+      margin-top:18px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.55;
+    }
+    .toolbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    button{
+      border:1px solid var(--border);
+      background:#101735;
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-size:14px;
+    }
+    button:hover{ background:#16204a; }
+    @media (max-width: 1050px){
+      .grid{ grid-template-columns:1fr; }
+      .cards{ grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const {useMemo, useState} = React;
+
+    function fmt(n, digits=2){
+      if (!Number.isFinite(n)) return "-";
+      return n.toLocaleString("en-AU", {maximumFractionDigits: digits, minimumFractionDigits: digits});
+    }
+
+    function calcScenario({
+      principalRMB,
+      spotOpen,
+      forward,
+      barrier,
+      annualYield,
+      months,
+      ratioType,
+      triggerSpot,
+      rebuySpot
+    }){
+      const T = months / 12;
+      const initialAUD = principalRMB / spotOpen;
+      const carryRMB = principalRMB * annualYield * T;
+
+      const scenarioAbove = {
+        name: "情境 1：高于 Forward",
+        trigger: `到期市场 > ${forward}`,
+        settleRate: forward,
+        initialAUD,
+        rmbFromInitialAUD: initialAUD * forward,
+        pnlVsPrincipalRMB: initialAUD * forward - principalRMB,
+        carryRMB,
+        summary: "你放弃更高的市场价，按 forward 结算。"
+      };
+
+      const midSpot = (barrier + forward) / 2;
+      const scenarioMid = {
+        name: "情境 2：Barrier 与 Forward 之间",
+        trigger: `${barrier} ≤ 到期市场 ≤ ${forward}`,
+        settleRate: midSpot,
+        initialAUD,
+        rmbFromInitialAUD: initialAUD * midSpot,
+        pnlVsPrincipalRMB: initialAUD * midSpot - principalRMB,
+        carryRMB,
+        summary: "按更好的市场价结算，不触发 2 倍金额。"
+      };
+
+      // Trigger scenario
+      const totalAUD = 2 * initialAUD;
+      const totalRMBReceived = totalAUD * forward;
+      const payOriginalPlanRMB = principalRMB;
+      const remainingRMB = totalRMBReceived - payOriginalPlanRMB;
+      const reboughtAUD = remainingRMB / rebuySpot;
+      const netAUDChange = reboughtAUD - initialAUD;
+      const finalTotalAUD = reboughtAUD;
+      const finalTotalRMBAtRebuySpot = finalTotalAUD * rebuySpot;
+
+      const scenarioTrigger = {
+        name: "情境 3：触发 Barrier",
+        trigger: `观察期内任意时点触及 < ${barrier}`,
+        triggerSpot,
+        settleRate: forward,
+        initialAUD,
+        totalAUD,
+        totalRMBReceived,
+        payOriginalPlanRMB,
+        remainingRMB,
+        rebuySpot,
+        reboughtAUD,
+        netAUDChange,
+        finalTotalAUD,
+        finalTotalRMBAtRebuySpot,
+        carryRMB,
+        summary: "按 4.70 结算，但金额固定为初始 AUD 的 2 倍；剩余人民币再按设定赎回汇率买回 AUD。"
+      };
+
+      return {scenarioAbove, scenarioMid, scenarioTrigger};
+    }
+
+    function buildGrid(principalRMB, forward, annualYield, months){
+      const openSpots = [4.45, 4.55, 4.65, 4.75, 4.85];
+      const rebuySpots = [4.59, 4.50, 4.40];
+      const T = months / 12;
+      const carryRMB = principalRMB * annualYield * T;
+
+      const rows = [];
+      openSpots.forEach(s0 => {
+        rebuySpots.forEach(s1 => {
+          const initialAUD = principalRMB / s0;
+          const totalAUD = initialAUD * 2;
+          const totalRMBReceived = totalAUD * forward;
+          const remainingRMB = totalRMBReceived - principalRMB;
+          const reboughtAUD = remainingRMB / s1;
+          const netAUDChange = reboughtAUD - initialAUD;
+          rows.push({
+            s0, s1, initialAUD, totalAUD, totalRMBReceived, remainingRMB, reboughtAUD, netAUDChange, carryRMB
+          });
+        });
+      });
+      return rows;
+    }
+
+    function App(){
+      const [inputs, setInputs] = useState({
+        principalRMB: 5000000,
+        spotOpen: 4.70,
+        forward: 4.70,
+        barrier: 4.59,
+        annualYield: 0.0575,
+        months: 2,
+        triggerSpot: 4.55,
+        rebuySpot: 4.55
+      });
+
+      const out = useMemo(() => calcScenario(inputs), [inputs]);
+      const grid = useMemo(
+        () => buildGrid(inputs.principalRMB, inputs.forward, inputs.annualYield, inputs.months),
+        [inputs.principalRMB, inputs.forward, inputs.annualYield, inputs.months]
+      );
+
+      const update = (key, parser = parseFloat) => e => {
+        const v = e.target.value;
+        setInputs(prev => ({...prev, [key]: parser === null ? v : parser(v)}));
+      };
+
+      const triggerCardClass =
+        out.scenarioTrigger.netAUDChange > 0 ? "good" :
+        out.scenarioTrigger.netAUDChange < 0 ? "bad" : "warn";
+
+      return (
+        <div className="wrap">
+          <h1>Forward Extra 情境计算器</h1>
+          <div className="sub">
+            这是一个用于做 <b>情境分析</b> 的 mini app，不是概率模型。你可以输入不同变量，
+            看不触发和触发 barrier 时的现金流变化。这里默认所有“追加金额”都来自自有资金。
+          </div>
+
+          <div className="grid">
+            <div className="panel">
+              <h2>输入变量</h2>
+              <div className="toolbar">
+                <button onClick={() => setInputs({
+                  principalRMB: 5000000,
+                  spotOpen: 4.70,
+                  forward: 4.70,
+                  barrier: 4.59,
+                  annualYield: 0.0575,
+                  months: 2,
+                  triggerSpot: 4.55,
+                  rebuySpot: 4.55
+                })}>重置默认值</button>
+                <button onClick={() => setInputs(prev => ({...prev, rebuySpot: prev.barrier}))}>赎回价 = Barrier</button>
+                <button onClick={() => setInputs(prev => ({...prev, rebuySpot: Math.min(prev.barrier - 0.09, prev.barrier)}))}>赎回价更低</button>
+              </div>
+
+              <div className="inputs">
+                <div className="field">
+                  <label>初始本金（RMB）</label>
+                  <input type="number" value={inputs.principalRMB} onChange={update("principalRMB")} />
+                </div>
+
+                <div className="row2">
+                  <div className="field">
+                    <label>初始 Spot（RMB/AUD）</label>
+                    <input type="number" step="0.0001" value={inputs.spotOpen} onChange={update("spotOpen")} />
+                  </div>
+                  <div className="field">
+                    <label>Forward Rate</label>
+                    <input type="number" step="0.0001" value={inputs.forward} onChange={update("forward")} />
+                  </div>
+                </div>
+
+                <div className="row3">
+                  <div className="field">
+                    <label>Barrier</label>
+                    <input type="number" step="0.0001" value={inputs.barrier} onChange={update("barrier")} />
+                  </div>
+                  <div className="field">
+                    <label>资金池年化回报</label>
+                    <input type="number" step="0.0001" value={inputs.annualYield} onChange={update("annualYield")} />
+                  </div>
+                  <div className="field">
+                    <label>持有月数</label>
+                    <input type="number" step="1" value={inputs.months} onChange={update("months")} />
+                  </div>
+                </div>
+
+
+                <div className="row2">
+                  <div className="field">
+                    <label>触发时市场汇率（仅展示）</label>
+                    <input type="number" step="0.0001" value={inputs.triggerSpot} onChange={update("triggerSpot")} />
+                  </div>
+                  <div className="field">
+                    <label>剩余 RMB 赎回 AUD 的汇率</label>
+                    <input type="number" step="0.0001" value={inputs.rebuySpot} onChange={update("rebuySpot")} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="note">
+                这个工具默认：<br />
+                1）初始 500 万 RMB 先换成 AUD；<br />
+                2）若触发 barrier，则按 forward 以 2 倍金额做 AUD → RMB；<br />
+                3）其中一部分 RMB 用于原计划支付，剩余部分再买回 AUD；<br />
+                4）没有计入点差、手续费、流动性滑点、结算延迟，也没有判断 deliverable / NDF。<br />
+                所以它适合做“情境推演”，不适合直接当真实成交盈亏。
+              </div>
+            </div>
+
+            <div>
+              <div className="cards">
+                <div className="card">
+                  <div className="tag">情境 1</div>
+                  <h2>{out.scenarioAbove.name}</h2>
+                  <div className="small">{out.scenarioAbove.trigger}</div>
+                  <div className="num">{fmt(out.scenarioAbove.rmbFromInitialAUD, 0)} RMB</div>
+                  <div className={out.scenarioAbove.pnlVsPrincipalRMB >= 0 ? "good" : "bad"}>
+                    相对初始本金汇兑变化：{fmt(out.scenarioAbove.pnlVsPrincipalRMB, 0)} RMB
+                  </div>
+                  <div className="small">
+                    初始换得 AUD：{fmt(out.scenarioAbove.initialAUD, 2)}<br/>
+                    结算汇率：{fmt(out.scenarioAbove.settleRate, 4)}<br/>
+                    资金池收益：{fmt(out.scenarioAbove.carryRMB, 0)} RMB
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="tag">情境 2</div>
+                  <h2>{out.scenarioMid.name}</h2>
+                  <div className="small">{out.scenarioMid.trigger}</div>
+                  <div className="num">{fmt(out.scenarioMid.rmbFromInitialAUD, 0)} RMB</div>
+                  <div className={out.scenarioMid.pnlVsPrincipalRMB >= 0 ? "good" : "bad"}>
+                    相对初始本金汇兑变化：{fmt(out.scenarioMid.pnlVsPrincipalRMB, 0)} RMB
+                  </div>
+                  <div className="small">
+                    初始换得 AUD：{fmt(out.scenarioMid.initialAUD, 2)}<br/>
+                    示例区间汇率：{fmt(out.scenarioMid.settleRate, 4)}<br/>
+                    资金池收益：{fmt(out.scenarioMid.carryRMB, 0)} RMB
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="tag">情境 3</div>
+                  <h2>{out.scenarioTrigger.name}</h2>
+                  <div className="small">{out.scenarioTrigger.trigger}</div>
+                  <div className="num">{fmt(out.scenarioTrigger.reboughtAUD, 2)} AUD</div>
+                  <div className={triggerCardClass}>
+                    赎回后相对初始 AUD 的净变化：{fmt(out.scenarioTrigger.netAUDChange, 2)} AUD
+                  </div>
+                  <div className="small">
+                    初始 AUD：{fmt(out.scenarioTrigger.initialAUD, 2)}<br/>
+                    2 倍结算总 AUD（固定规则）：{fmt(out.scenarioTrigger.totalAUD, 2)}<br/>
+                    按 4.70 换得：{fmt(out.scenarioTrigger.totalRMBReceived, 0)} RMB<br/>
+                    原计划支付：{fmt(out.scenarioTrigger.payOriginalPlanRMB, 0)} RMB<br/>
+                    剩余可赎回：{fmt(out.scenarioTrigger.remainingRMB, 0)} RMB<br/>
+                    赎回汇率：{fmt(out.scenarioTrigger.rebuySpot, 4)}<br/>
+                    最终持有 AUD：{fmt(out.scenarioTrigger.finalTotalAUD, 2)}<br/>
+                    按赎回汇率折算最终价值：{fmt(out.scenarioTrigger.finalTotalRMBAtRebuySpot, 0)} RMB<br/>
+                    资金池收益：{fmt(out.scenarioTrigger.carryRMB, 0)} RMB
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel">
+                <h2>触发情境：敏感度表（默认按 AUD 名义金额翻倍）</h2>
+                <div className="small">
+                  横向看不同的初始 Spot，纵向看不同的赎回汇率。这里已经固定采用你确认的规则：
+                  <b>barrier 触发后，总交割金额 = 初始换到手的 AUD 的 2 倍</b>。
+                </div>
+
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>初始 Spot S₀</th>
+                      <th>赎回汇率 S₁</th>
+                      <th>初始 AUD</th>
+                      <th>2x 结算后剩余 RMB</th>
+                      <th>赎回后 AUD</th>
+                      <th>净变化 AUD</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {grid.map((r, idx) => (
+                      <tr key={idx}>
+                        <td>{fmt(r.s0, 4)}</td>
+                        <td>{fmt(r.s1, 4)}</td>
+                        <td>{fmt(r.initialAUD, 2)}</td>
+                        <td>{fmt(r.remainingRMB, 0)}</td>
+                        <td>{fmt(r.reboughtAUD, 2)}</td>
+                        <td className={r.netAUDChange > 0 ? "good" : r.netAUDChange < 0 ? "bad" : "warn"}>
+                          {fmt(r.netAUDChange, 2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="formula">
+                  <b>当前版本的触发情境公式</b><br/>
+                  初始 AUD = 初始本金 RMB ÷ 初始 Spot<br/>
+                  触发后总交割 AUD = 2 × 初始 AUD（或按你选择的名义金额规则）<br/>
+                  按 Forward 换得 RMB = 总交割 AUD × Forward<br/>
+                  剩余 RMB = 按 Forward 换得 RMB − 原计划支付 RMB<br/>
+                  赎回 AUD = 剩余 RMB ÷ 赎回汇率<br/>
+                  净变化 AUD = 赎回 AUD − 初始 AUD
+                </div>
+
+                <div className="footer">
+                  建议下一步和换汇商确认的条款：<br/>
+                  1）deliverable 还是 NDF；<br/>
+                  2）barrier 是盘中触碰还是收盘触发；<br/>
+                  3）触发后是否允许立即反向换汇；<br/>
+                  4）赎回腿是否能事先写进合同，以及对应报价如何调整；<br/>
+                  5）spot 与 forward 的实际点差和手续费。
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
