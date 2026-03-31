@@ -196,6 +196,7 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="calc.js"></script>
 
   <script type="text/babel">
     const {useMemo, useState} = React;
@@ -203,99 +204,6 @@
     function fmt(n, digits=2){
       if (!Number.isFinite(n)) return "-";
       return n.toLocaleString("en-AU", {maximumFractionDigits: digits, minimumFractionDigits: digits});
-    }
-
-    function calcScenario({
-      principalRMB,
-      spotOpen,
-      forward,
-      barrier,
-      annualYield,
-      months,
-      ratioType,
-      triggerSpot,
-      rebuySpot
-    }){
-      const T = months / 12;
-      const initialAUD = principalRMB / spotOpen;
-      const carryRMB = principalRMB * annualYield * T;
-
-      const scenarioAbove = {
-        name: "情境 1：高于 Forward",
-        trigger: `到期市场 > ${forward}`,
-        settleRate: forward,
-        initialAUD,
-        rmbFromInitialAUD: initialAUD * forward,
-        pnlVsPrincipalRMB: initialAUD * forward - principalRMB,
-        carryRMB,
-        summary: "你放弃更高的市场价，按 forward 结算。"
-      };
-
-      const midSpot = (barrier + forward) / 2;
-      const scenarioMid = {
-        name: "情境 2：Barrier 与 Forward 之间",
-        trigger: `${barrier} ≤ 到期市场 ≤ ${forward}`,
-        settleRate: midSpot,
-        initialAUD,
-        rmbFromInitialAUD: initialAUD * midSpot,
-        pnlVsPrincipalRMB: initialAUD * midSpot - principalRMB,
-        carryRMB,
-        summary: "按更好的市场价结算，不触发 2 倍金额。"
-      };
-
-      // Trigger scenario
-      const totalAUD = 2 * initialAUD;
-      const totalRMBReceived = totalAUD * forward;
-      const payOriginalPlanRMB = principalRMB;
-      const remainingRMB = totalRMBReceived - payOriginalPlanRMB;
-      const reboughtAUD = remainingRMB / rebuySpot;
-      const netAUDChange = reboughtAUD - initialAUD;
-      const finalTotalAUD = reboughtAUD;
-      const finalTotalRMBAtRebuySpot = finalTotalAUD * rebuySpot;
-
-      const scenarioTrigger = {
-        name: "情境 3：触发 Barrier",
-        trigger: `观察期内任意时点触及 < ${barrier}`,
-        triggerSpot,
-        settleRate: forward,
-        initialAUD,
-        totalAUD,
-        totalRMBReceived,
-        payOriginalPlanRMB,
-        remainingRMB,
-        rebuySpot,
-        reboughtAUD,
-        netAUDChange,
-        finalTotalAUD,
-        finalTotalRMBAtRebuySpot,
-        carryRMB,
-        summary: "按 4.70 结算，但金额固定为初始 AUD 的 2 倍；剩余人民币再按设定赎回汇率买回 AUD。"
-      };
-
-      return {scenarioAbove, scenarioMid, scenarioTrigger};
-    }
-
-    function buildGrid(principalRMB, forward, annualYield, months){
-      const openSpots = [4.45, 4.55, 4.65, 4.75, 4.85];
-      const rebuySpots = [4.59, 4.50, 4.40];
-      const T = months / 12;
-      const carryRMB = principalRMB * annualYield * T;
-
-      const rows = [];
-      openSpots.forEach(s0 => {
-        rebuySpots.forEach(s1 => {
-          const initialAUD = principalRMB / s0;
-          const totalAUD = initialAUD * 2;
-          const totalRMBReceived = totalAUD * forward;
-          const remainingRMB = totalRMBReceived - principalRMB;
-          const reboughtAUD = remainingRMB / s1;
-          const netAUDChange = reboughtAUD - initialAUD;
-          rows.push({
-            s0, s1, initialAUD, totalAUD, totalRMBReceived, remainingRMB, reboughtAUD, netAUDChange, carryRMB
-          });
-        });
-      });
-      return rows;
     }
 
     function App(){
@@ -306,14 +214,15 @@
         barrier: 4.59,
         annualYield: 0.0575,
         months: 2,
+        expirySpot: 4.65,
         triggerSpot: 4.55,
         rebuySpot: 4.55
       });
 
       const out = useMemo(() => calcScenario(inputs), [inputs]);
       const grid = useMemo(
-        () => buildGrid(inputs.principalRMB, inputs.forward, inputs.annualYield, inputs.months),
-        [inputs.principalRMB, inputs.forward, inputs.annualYield, inputs.months]
+        () => buildGrid(inputs.principalRMB, inputs.forward, inputs.annualYield, inputs.months, inputs.spotOpen, inputs.rebuySpot),
+        [inputs.principalRMB, inputs.forward, inputs.annualYield, inputs.months, inputs.spotOpen, inputs.rebuySpot]
       );
 
       const update = (key, parser = parseFloat) => e => {
@@ -344,6 +253,7 @@
                   barrier: 4.59,
                   annualYield: 0.0575,
                   months: 2,
+                  expirySpot: 4.65,
                   triggerSpot: 4.55,
                   rebuySpot: 4.55
                 })}>重置默认值</button>
@@ -384,7 +294,11 @@
                 </div>
 
 
-                <div className="row2">
+                <div className="row3">
+                  <div className="field">
+                    <label>情境2到期汇率（B ≤ ST ≤ F）</label>
+                    <input type="number" step="0.0001" value={inputs.expirySpot} onChange={update("expirySpot")} />
+                  </div>
                   <div className="field">
                     <label>触发时市场汇率（仅展示）</label>
                     <input type="number" step="0.0001" value={inputs.triggerSpot} onChange={update("triggerSpot")} />
@@ -413,12 +327,13 @@
                   <h2>{out.scenarioAbove.name}</h2>
                   <div className="small">{out.scenarioAbove.trigger}</div>
                   <div className="num">{fmt(out.scenarioAbove.rmbFromInitialAUD, 0)} RMB</div>
-                  <div className={out.scenarioAbove.pnlVsPrincipalRMB >= 0 ? "good" : "bad"}>
-                    相对初始本金汇兑变化：{fmt(out.scenarioAbove.pnlVsPrincipalRMB, 0)} RMB
+                  <div className={out.scenarioAbove.totalPnlRMB >= 0 ? "good" : "bad"}>
+                    综合损益（含资金池）：{fmt(out.scenarioAbove.totalPnlRMB, 0)} RMB
                   </div>
                   <div className="small">
                     初始换得 AUD：{fmt(out.scenarioAbove.initialAUD, 2)}<br/>
                     结算汇率：{fmt(out.scenarioAbove.settleRate, 4)}<br/>
+                    汇兑损益：{fmt(out.scenarioAbove.pnlVsPrincipalRMB, 0)} RMB<br/>
                     资金池收益：{fmt(out.scenarioAbove.carryRMB, 0)} RMB
                   </div>
                 </div>
@@ -428,12 +343,13 @@
                   <h2>{out.scenarioMid.name}</h2>
                   <div className="small">{out.scenarioMid.trigger}</div>
                   <div className="num">{fmt(out.scenarioMid.rmbFromInitialAUD, 0)} RMB</div>
-                  <div className={out.scenarioMid.pnlVsPrincipalRMB >= 0 ? "good" : "bad"}>
-                    相对初始本金汇兑变化：{fmt(out.scenarioMid.pnlVsPrincipalRMB, 0)} RMB
+                  <div className={out.scenarioMid.totalPnlRMB >= 0 ? "good" : "bad"}>
+                    综合损益（含资金池）：{fmt(out.scenarioMid.totalPnlRMB, 0)} RMB
                   </div>
                   <div className="small">
                     初始换得 AUD：{fmt(out.scenarioMid.initialAUD, 2)}<br/>
-                    示例区间汇率：{fmt(out.scenarioMid.settleRate, 4)}<br/>
+                    到期结算汇率：{fmt(out.scenarioMid.settleRate, 4)}<br/>
+                    汇兑损益：{fmt(out.scenarioMid.pnlVsPrincipalRMB, 0)} RMB<br/>
                     资金池收益：{fmt(out.scenarioMid.carryRMB, 0)} RMB
                   </div>
                 </div>
@@ -446,15 +362,18 @@
                   <div className={triggerCardClass}>
                     赎回后相对初始 AUD 的净变化：{fmt(out.scenarioTrigger.netAUDChange, 2)} AUD
                   </div>
+                  <div className={out.scenarioTrigger.totalPnlRMB >= 0 ? "good" : "bad"}>
+                    综合损益（含资金池）：{fmt(out.scenarioTrigger.totalPnlRMB, 0)} RMB
+                  </div>
                   <div className="small">
                     初始 AUD：{fmt(out.scenarioTrigger.initialAUD, 2)}<br/>
                     2 倍结算总 AUD（固定规则）：{fmt(out.scenarioTrigger.totalAUD, 2)}<br/>
-                    按 4.70 换得：{fmt(out.scenarioTrigger.totalRMBReceived, 0)} RMB<br/>
+                    按 {fmt(inputs.forward, 2)} 换得：{fmt(out.scenarioTrigger.totalRMBReceived, 0)} RMB<br/>
                     原计划支付：{fmt(out.scenarioTrigger.payOriginalPlanRMB, 0)} RMB<br/>
                     剩余可赎回：{fmt(out.scenarioTrigger.remainingRMB, 0)} RMB<br/>
                     赎回汇率：{fmt(out.scenarioTrigger.rebuySpot, 4)}<br/>
                     最终持有 AUD：{fmt(out.scenarioTrigger.finalTotalAUD, 2)}<br/>
-                    按赎回汇率折算最终价值：{fmt(out.scenarioTrigger.finalTotalRMBAtRebuySpot, 0)} RMB<br/>
+                    持有 AUD 当前价值：{fmt(out.scenarioTrigger.finalAUDValueInRMB, 0)} RMB<br/>
                     资金池收益：{fmt(out.scenarioTrigger.carryRMB, 0)} RMB
                   </div>
                 </div>
@@ -476,6 +395,8 @@
                       <th>2x 结算后剩余 RMB</th>
                       <th>赎回后 AUD</th>
                       <th>净变化 AUD</th>
+                      <th>资金池收益</th>
+                      <th>综合损益</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -488,6 +409,10 @@
                         <td>{fmt(r.reboughtAUD, 2)}</td>
                         <td className={r.netAUDChange > 0 ? "good" : r.netAUDChange < 0 ? "bad" : "warn"}>
                           {fmt(r.netAUDChange, 2)}
+                        </td>
+                        <td>{fmt(r.carryRMB, 0)}</td>
+                        <td className={r.totalPnlRMB > 0 ? "good" : r.totalPnlRMB < 0 ? "bad" : "warn"}>
+                          {fmt(r.totalPnlRMB, 0)}
                         </td>
                       </tr>
                     ))}
