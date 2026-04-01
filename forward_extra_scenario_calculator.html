@@ -100,7 +100,7 @@
     }
     .cards{
       display:grid;
-      grid-template-columns:repeat(3, 1fr);
+      grid-template-columns:repeat(2, 1fr);
       gap:16px;
       margin-bottom:16px;
     }
@@ -214,7 +214,6 @@
         barrier: 4.59,
         annualYield: 0.0575,
         months: 2,
-        expirySpot: 4.65,
         triggerSpot: 4.55,
         rebuySpot: 4.55
       });
@@ -239,7 +238,7 @@
           <h1>Forward Extra 情境计算器</h1>
           <div className="sub">
             这是一个用于做 <b>情境分析</b> 的 mini app，不是概率模型。你可以输入不同变量，
-            看不触发和触发 barrier 时的现金流变化。这里默认所有“追加金额”都来自自有资金。
+            看不触发和触发 barrier 时的现金流变化。这里默认所有"追加金额"都来自自有资金。
           </div>
 
           <div className="grid">
@@ -253,7 +252,6 @@
                   barrier: 4.59,
                   annualYield: 0.0575,
                   months: 2,
-                  expirySpot: 4.65,
                   triggerSpot: 4.55,
                   rebuySpot: 4.55
                 })}>重置默认值</button>
@@ -293,14 +291,9 @@
                   </div>
                 </div>
 
-
-                <div className="row3">
+                <div className="row2">
                   <div className="field">
-                    <label>情境2到期汇率（B ≤ ST ≤ F）</label>
-                    <input type="number" step="0.0001" value={inputs.expirySpot} onChange={update("expirySpot")} />
-                  </div>
-                  <div className="field">
-                    <label>触发时市场汇率（仅展示）</label>
+                    <label>触发时市场汇率</label>
                     <input type="number" step="0.0001" value={inputs.triggerSpot} onChange={update("triggerSpot")} />
                   </div>
                   <div className="field">
@@ -316,7 +309,7 @@
                 2）若触发 barrier，则按 forward 以 2 倍金额做 AUD → RMB；<br />
                 3）其中一部分 RMB 用于原计划支付，剩余部分再买回 AUD；<br />
                 4）没有计入点差、手续费、流动性滑点、结算延迟，也没有判断 deliverable / NDF。<br />
-                所以它适合做“情境推演”，不适合直接当真实成交盈亏。
+                所以它适合做"情境推演"，不适合直接当真实成交盈亏。
               </div>
             </div>
 
@@ -324,38 +317,22 @@
               <div className="cards">
                 <div className="card">
                   <div className="tag">情境 1</div>
-                  <h2>{out.scenarioAbove.name}</h2>
-                  <div className="small">{out.scenarioAbove.trigger}</div>
-                  <div className="num">{fmt(out.scenarioAbove.rmbFromInitialAUD, 0)} RMB</div>
-                  <div className={out.scenarioAbove.totalPnlRMB >= 0 ? "good" : "bad"}>
-                    综合损益（含资金池）：{fmt(out.scenarioAbove.totalPnlRMB, 0)} RMB
+                  <h2>{out.scenarioNoTrigger.name}</h2>
+                  <div className="small">{out.scenarioNoTrigger.trigger}</div>
+                  <div className="num">{fmt(out.scenarioNoTrigger.rmbFromInitialAUD, 0)} RMB</div>
+                  <div className={out.scenarioNoTrigger.totalPnlRMB >= 0 ? "good" : "bad"}>
+                    综合损益（含资金池）：{fmt(out.scenarioNoTrigger.totalPnlRMB, 0)} RMB
                   </div>
                   <div className="small">
-                    初始换得 AUD：{fmt(out.scenarioAbove.initialAUD, 2)}<br/>
-                    结算汇率：{fmt(out.scenarioAbove.settleRate, 4)}<br/>
-                    汇兑损益：{fmt(out.scenarioAbove.pnlVsPrincipalRMB, 0)} RMB<br/>
-                    资金池收益：{fmt(out.scenarioAbove.carryRMB, 0)} RMB
+                    初始换得 AUD：{fmt(out.scenarioNoTrigger.initialAUD, 2)}<br/>
+                    结算汇率：{fmt(out.scenarioNoTrigger.settleRate, 4)}<br/>
+                    汇兑损益：{fmt(out.scenarioNoTrigger.pnlVsPrincipalRMB, 0)} RMB<br/>
+                    资金池收益：{fmt(out.scenarioNoTrigger.carryRMB, 0)} RMB
                   </div>
                 </div>
 
                 <div className="card">
                   <div className="tag">情境 2</div>
-                  <h2>{out.scenarioMid.name}</h2>
-                  <div className="small">{out.scenarioMid.trigger}</div>
-                  <div className="num">{fmt(out.scenarioMid.rmbFromInitialAUD, 0)} RMB</div>
-                  <div className={out.scenarioMid.totalPnlRMB >= 0 ? "good" : "bad"}>
-                    综合损益（含资金池）：{fmt(out.scenarioMid.totalPnlRMB, 0)} RMB
-                  </div>
-                  <div className="small">
-                    初始换得 AUD：{fmt(out.scenarioMid.initialAUD, 2)}<br/>
-                    到期结算汇率：{fmt(out.scenarioMid.settleRate, 4)}<br/>
-                    汇兑损益：{fmt(out.scenarioMid.pnlVsPrincipalRMB, 0)} RMB<br/>
-                    资金池收益：{fmt(out.scenarioMid.carryRMB, 0)} RMB
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="tag">情境 3</div>
                   <h2>{out.scenarioTrigger.name}</h2>
                   <div className="small">{out.scenarioTrigger.trigger}</div>
                   <div className="num">{fmt(out.scenarioTrigger.reboughtAUD, 2)} AUD</div>
@@ -420,9 +397,9 @@
                 </table>
 
                 <div className="formula">
-                  <b>当前版本的触发情境公式</b><br/>
+                  <b>触发情境公式</b><br/>
                   初始 AUD = 初始本金 RMB ÷ 初始 Spot<br/>
-                  触发后总交割 AUD = 2 × 初始 AUD（或按你选择的名义金额规则）<br/>
+                  触发后总交割 AUD = 2 × 初始 AUD<br/>
                   按 Forward 换得 RMB = 总交割 AUD × Forward<br/>
                   剩余 RMB = 按 Forward 换得 RMB − 原计划支付 RMB<br/>
                   赎回 AUD = 剩余 RMB ÷ 赎回汇率<br/>
