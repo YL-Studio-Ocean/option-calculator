@@ -10,7 +10,6 @@ function calcScenario({
   barrier,
   annualYield,
   months,
-  expirySpot,
   triggerSpot,
   rebuySpot
 }) {
@@ -18,37 +17,22 @@ function calcScenario({
   const initialAUD = principalRMB / spotOpen;
   const carryRMB = principalRMB * annualYield * T;
 
-  // Scenario 1: ST > F
+  // Scenario 1: no barrier trigger — settle at F
   const s1_rmbFromInitialAUD = initialAUD * forward;
   const s1_pnlVsPrincipalRMB = s1_rmbFromInitialAUD - principalRMB;
-  const scenarioAbove = {
-    name: "情境 1：高于 Forward",
-    trigger: `到期市场 > ${forward}`,
+  const scenarioNoTrigger = {
+    name: "情境 1：未触发 Barrier",
+    trigger: `观察期内未触及 < ${barrier}`,
     settleRate: forward,
     initialAUD,
     rmbFromInitialAUD: s1_rmbFromInitialAUD,
     pnlVsPrincipalRMB: s1_pnlVsPrincipalRMB,
     carryRMB,
     totalPnlRMB: s1_pnlVsPrincipalRMB + carryRMB,
-    summary: `你放弃更高的市场价，按 ${forward} 结算。`
+    summary: `按 ${forward} 结算，无论到期市场价在哪。`
   };
 
-  // Scenario 2: B <= ST <= F, settle at user-specified expirySpot
-  const s2_rmbFromInitialAUD = initialAUD * expirySpot;
-  const s2_pnlVsPrincipalRMB = s2_rmbFromInitialAUD - principalRMB;
-  const scenarioMid = {
-    name: "情境 2：Barrier 与 Forward 之间",
-    trigger: `${barrier} ≤ 到期市场 ≤ ${forward}`,
-    settleRate: expirySpot,
-    initialAUD,
-    rmbFromInitialAUD: s2_rmbFromInitialAUD,
-    pnlVsPrincipalRMB: s2_pnlVsPrincipalRMB,
-    carryRMB,
-    totalPnlRMB: s2_pnlVsPrincipalRMB + carryRMB,
-    summary: "按到期市场价结算，不触发 2 倍金额。"
-  };
-
-  // Scenario 3: barrier triggered
+  // Scenario 2: barrier triggered — deliver 2×AUD0 at F, then rebalance
   const totalAUD = 2 * initialAUD;
   const totalRMBReceived = totalAUD * forward;
   const payOriginalPlanRMB = principalRMB;
@@ -57,10 +41,10 @@ function calcScenario({
   const netAUDChange = reboughtAUD - initialAUD;
   const finalTotalAUD = reboughtAUD;
   const finalAUDValueInRMB = finalTotalAUD * rebuySpot;
-  const s3_pnlVsPrincipalRMB = netAUDChange * rebuySpot;
+  const s2_pnlVsPrincipalRMB = netAUDChange * rebuySpot;
 
   const scenarioTrigger = {
-    name: "情境 3：触发 Barrier",
+    name: "情境 2：触发 Barrier",
     trigger: `观察期内任意时点触及 < ${barrier}`,
     triggerSpot,
     settleRate: forward,
@@ -75,12 +59,12 @@ function calcScenario({
     finalTotalAUD,
     finalAUDValueInRMB,
     carryRMB,
-    pnlVsPrincipalRMB: s3_pnlVsPrincipalRMB,
-    totalPnlRMB: s3_pnlVsPrincipalRMB + carryRMB,
+    pnlVsPrincipalRMB: s2_pnlVsPrincipalRMB,
+    totalPnlRMB: s2_pnlVsPrincipalRMB + carryRMB,
     summary: `按 ${forward} 结算，但金额固定为初始 AUD 的 2 倍；剩余人民币再按设定赎回汇率买回 AUD。`
   };
 
-  return { scenarioAbove, scenarioMid, scenarioTrigger };
+  return { scenarioNoTrigger, scenarioTrigger };
 }
 
 function buildGrid(principalRMB, forward, annualYield, months, spotOpen, rebuySpot) {
